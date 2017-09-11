@@ -18,8 +18,12 @@ include_once('http://raw.githubusercontent.com/sunra/php-simple-html-dom-parser/
 //	- added isnullorempty function
 //	- optimized code
 //
-//	1-2 / 24-08-2017
+//	1.2 / 24-08-2017
 //	- added var to show or not direct download link for each link on the folder
+//
+//	1.3 / 12-09-2017
+//	- fixed function file_get_contents_curl not sending correct cookie 
+//	- added HTTPS curl support
 //
 //======================================================================
 // Configs
@@ -61,7 +65,7 @@ function get_links_from_folder($url) {
 	$result_cookie = null;
 	
 	$dom = new simple_html_dom(null);
-	$contents = file_get_contents_curl($url, null);
+	$contents = file_get_contents_curl($url, $cookie);
 	$dom->load($contents, true);
 
 	preg_match('/<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"(.*)\" \/>/U', $dom, $match);
@@ -72,7 +76,8 @@ function get_links_from_folder($url) {
 		$mFolderId = $dom->getElementById('FolderId')->getAttribute('value');
 
 		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, 'http://minhateca.com.br/action/Files/LoginToFolder');
+		curl_setopt($ch, CURLOPT_URL, 'https://minhateca.com.br/action/Files/LoginToFolder');
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		curl_setopt($ch, CURLOPT_HEADER, 1);
 		curl_setopt($ch, CURLOPT_HTTPHEADER, array('Expect:'));
@@ -102,10 +107,13 @@ function get_links_from_folder($url) {
 					foreach($list->find('h3') as $list_h3) {
 						if ($direct_link)
 							// show direct link for download (need to have an account)
-							echo get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>";	
-						else						
+							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
+						else	
+							// show only the filename
+							//echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");							
+						
 							// show link to the file
-							echo "http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>";
+							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
 					}	
 				}
 				else {
@@ -117,10 +125,10 @@ function get_links_from_folder($url) {
 					foreach($list->find('h3') as $list_h3) {
 						if ($direct_link)
 							// show direct link for download (need to have an account)
-							echo get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>";	
+							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");
 						else						
 							// show link to the file
-							echo "http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>";
+							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
 					}
 				}
 			}
@@ -129,10 +137,10 @@ function get_links_from_folder($url) {
 			foreach($list->find('h3') as $list_h3) {
 				if ($direct_link)
 					// show direct link for download (need to have an account)
-					echo get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>";	
+					echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
 				else						
 					// show link to the file
-					echo "http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>";			
+					echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");			
 			}
 		}
 	}
@@ -143,7 +151,8 @@ function get_links_from_folder($url) {
 */
 function get_cookie_access($username, $password) {
 	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_URL, 'http://minhateca.com.br/action/login/login');
+	curl_setopt($ch, CURLOPT_URL, 'https://minhateca.com.br/action/login/login');
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
 	curl_setopt($ch, CURLOPT_HEADER, 1);
@@ -156,7 +165,7 @@ function get_cookie_access($username, $password) {
 
 	preg_match_all('/\nSet-Cookie: (.*)(;|\r\n)/Ui', $result, $ms);
 	$result_cookie = implode('; ', $ms[1]);
-		
+	
 	return $result_cookie;
 }
 
@@ -166,6 +175,7 @@ function get_cookie_access($username, $password) {
 function file_get_contents_curl($url, $cookie) {
 	$ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	if (!IsNullOrEmptyString($cookie))
 		curl_setopt($ch, CURLOPT_COOKIE, $cookie);
@@ -188,7 +198,8 @@ function get_direct_download_link($url) {
 	preg_match("/^(.*),(\d+)(.*)?$/i",$url,$tmp);
 
 	$ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, 'http://minhateca.com.br/action/License/Download');
+    curl_setopt($ch, CURLOPT_URL, 'https://minhateca.com.br/action/License/Download');
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 0);
 	curl_setopt($ch, CURLOPT_HEADER, 0);
