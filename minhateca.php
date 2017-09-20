@@ -25,6 +25,10 @@ include_once('http://raw.githubusercontent.com/sunra/php-simple-html-dom-parser/
 //	- fixed function file_get_contents_curl not sending correct cookie 
 //	- added HTTPS curl support
 //
+//	1.4 / 20-09-2017
+//	- added option to show only filename for each link
+//
+//
 //======================================================================
 // Configs
 //======================================================================
@@ -45,7 +49,10 @@ $folder_url = '';
 $folder_password = '';
 
 // show direct download links for each link on the folder
-$direct_link = false;
+$show_direct_link = false;
+
+// show filename for each link on the folder
+$show_filename_link = true;
 
 //======================================================================
 // 
@@ -61,7 +68,7 @@ get_links_from_folder($folder_url);
 *	function to get links from url folder
 */
 function get_links_from_folder($url) {
-	global $folder_url, $folder_password, $cookie, $direct_link;
+	global $folder_url, $folder_password, $cookie, $show_direct_link, $show_filename_link;
 	$result_cookie = null;
 	
 	$dom = new simple_html_dom(null);
@@ -105,13 +112,13 @@ function get_links_from_folder($url) {
 			for ($i = 1; $i <= $list_page_count; $i++) {
 				if ($i==1) {
 					foreach($list->find('h3') as $list_h3) {
-						if ($direct_link)
+						if ($show_direct_link)
 							// show direct link for download (need to have an account)
 							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
-						else	
-							// show only the filename
-							//echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");							
-						
+						else if ($show_filename_link)	
+							// show link filename
+							echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");							
+						else
 							// show link to the file
 							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
 					}	
@@ -123,9 +130,12 @@ function get_links_from_folder($url) {
 					
 					$list = $dom->getElementById('listView');
 					foreach($list->find('h3') as $list_h3) {
-						if ($direct_link)
+						if ($show_direct_link)
 							// show direct link for download (need to have an account)
 							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");
+						else if ($show_filename_link)	
+							// show link filename
+							echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");								
 						else						
 							// show link to the file
 							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
@@ -135,9 +145,12 @@ function get_links_from_folder($url) {
 		}
 		else {
 			foreach($list->find('h3') as $list_h3) {
-				if ($direct_link)
+				if ($show_direct_link)
 					// show direct link for download (need to have an account)
 					echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
+				else if ($show_filename_link)	
+					// show link filename
+					echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");						
 				else						
 					// show link to the file
 					echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");			
