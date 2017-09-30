@@ -1,7 +1,7 @@
 <?php
 /**
  * @author    Gonçalo Esteves
- * @version   1.2
+ * @version   1.5
  * @copyright Copyright (c) 2017, Gonçalo Esteves
  */
  
@@ -28,6 +28,10 @@ include_once('http://raw.githubusercontent.com/sunra/php-simple-html-dom-parser/
 //	1.4 / 20-09-2017
 //	- added option to show only filename for each link
 //
+//	1.5 / 30-09-2017
+//	- added support for multiple folder links
+//	- added h3 separator for folders links
+//	- added filesize information when showing filename for each link
 //
 //======================================================================
 // Configs
@@ -45,8 +49,8 @@ $use_cookie = false;
 $cookie = $use_cookie == true ? $cookie : get_cookie_access($username, $password);
 
 // minhateca url folder
-$folder_url = '';
-$folder_password = '';
+$folders_list = ['url' => 'password', 
+				 'url' => 'password'];
 
 // show direct download links for each link on the folder
 $show_direct_link = false;
@@ -58,7 +62,9 @@ $show_filename_link = true;
 // 
 //======================================================================
 
-get_links_from_folder($folder_url);
+foreach($folders_list as $key=>$value){ 
+	get_links_from_folder($key, $value);  
+}
 	
 //======================================================================
 // Functions
@@ -67,12 +73,12 @@ get_links_from_folder($folder_url);
 /**
 *	function to get links from url folder
 */
-function get_links_from_folder($url) {
-	global $folder_url, $folder_password, $cookie, $show_direct_link, $show_filename_link;
+function get_links_from_folder($folder_url, $folder_password) {
+	global $cookie, $show_direct_link, $show_filename_link;
 	$result_cookie = null;
 	
 	$dom = new simple_html_dom(null);
-	$contents = file_get_contents_curl($url, $cookie);
+	$contents = file_get_contents_curl($folder_url, $cookie);
 	$dom->load($contents, true);
 
 	preg_match('/<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"(.*)\" \/>/U', $dom, $match);
@@ -104,57 +110,65 @@ function get_links_from_folder($url) {
 	}
 	
 	$list = $dom->getElementById('listView');
-		
+		 
 	if ($list != null) {
 		$list_page = $list->find('div[class=listView_paginator]',0);
+		$folder_name = $dom->find('div[class=frameHeaderNoImage frameHeader borderTopRadius]',0)->find('a',0)->innertext;
+		echo "<h2>" . $folder_name . "</h2>";
 		if ($list_page != null && count($list_page) > 0) {
 			$list_page_count = $list_page->find('ul',0) != null ? count($list_page->find('ul',0)->find('li')) : 1;
 			for ($i = 1; $i <= $list_page_count; $i++) {
 				if ($i==1) {
-					foreach($list->find('h3') as $list_h3) {
+					foreach($list->find('div[class=filerow fileItemContainer]') as $filerow) {
+						$filerow_filename_h3 = $filerow->find('div[class=filename]',0)->find('h3',0);
+						$filerow_filesize = $filerow->find('div[class=fileinfo tab]',0)->find('li',0)->find('span',0)->innertext;
 						if ($show_direct_link)
 							// show direct link for download (need to have an account)
-							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
+							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
 						else if ($show_filename_link)	
 							// show link filename
-							echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");							
+							echo urldecode(trim($filerow_filename_h3->find('a',0)->title) . "." . pathinfo(trim($filerow_filename_h3->find('a',0)->innertext), PATHINFO_EXTENSION) . " <b>(" . $filerow_filesize . ")</b><br>");							
 						else
 							// show link to the file
-							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
+							echo urldecode("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href') . "<br>");
 					}	
 				}
 				else {
 					$dom = new simple_html_dom(null);
-					$contents = file_get_contents_curl($url.',' .$i, $result_cookie);
+					$contents = file_get_contents_curl($folder_url.',' .$i, $result_cookie);
 					$dom->load($contents, true);
 					
 					$list = $dom->getElementById('listView');
-					foreach($list->find('h3') as $list_h3) {
+					foreach($list->find('div[class=filerow fileItemContainer]') as $filerow) {
+						$filerow_filename_h3 = $filerow->find('div[class=filename]',0)->find('h3',0);
+						$filerow_filesize = $filerow->find('div[class=fileinfo tab]',0)->find('li',0)->find('span',0)->innertext;
 						if ($show_direct_link)
 							// show direct link for download (need to have an account)
-							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");
+							echo urldecode(get_direct_download_link("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
 						else if ($show_filename_link)	
 							// show link filename
-							echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");								
-						else						
+							echo urldecode(trim($filerow_filename_h3->find('a',0)->title) . "." . pathinfo(trim($filerow_filename_h3->find('a',0)->innertext), PATHINFO_EXTENSION) . " <b>(" . $filerow_filesize . ")</b><br>");							
+						else
 							// show link to the file
-							echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");
-					}
+							echo urldecode("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href') . "<br>");
+					}	
 				}
 			}
 		}
 		else {
-			foreach($list->find('h3') as $list_h3) {
+			foreach($list->find('div[class=filerow fileItemContainer]') as $filerow) {
+				$filerow_filename_h3 = $filerow->find('div[class=filename]',0)->find('h3',0);
+				$filerow_filesize = $filerow->find('div[class=fileinfo tab]',0)->find('li',0)->find('span',0)->innertext;
 				if ($show_direct_link)
 					// show direct link for download (need to have an account)
-					echo urldecode(get_direct_download_link("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
+					echo urldecode(get_direct_download_link("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href'), $token) . "<br>");	
 				else if ($show_filename_link)	
 					// show link filename
-					echo urldecode(trim($list_h3->find('a',0)->innertext) . "<br>");						
-				else						
+					echo urldecode(trim($filerow_filename_h3->find('a',0)->title) . "." . pathinfo(trim($filerow_filename_h3->find('a',0)->innertext), PATHINFO_EXTENSION) . " <b>(" . $filerow_filesize . ")</b><br>");							
+				else
 					// show link to the file
-					echo urldecode("http://minhateca.com.br" . $list_h3->find('a',0)->getAttribute('href') . "<br>");			
-			}
+					echo urldecode("http://minhateca.com.br" . $filerow_filename_h3->find('a',0)->getAttribute('href') . "<br>");
+			}	
 		}
 	}
 }
